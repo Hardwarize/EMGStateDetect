@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emgstatedetect"
+version = "0.1.0"
+description = "Toolkit for EMG state detection"
+authors = [
+  { name = "Guillermo Álvarez", email = "hardwarize@gmail.com" }
+]
+dependencies = [
+  "numpy==1.26.4",
+  "libemg==2.0.0",
+  "scipy",
+  "matplotlib",
+  "pydantic",
+  "opencv-python-headless",
+  "requests==2.32.3"
+]
+readme = "README.md"
+requires-python = ">=3.8"

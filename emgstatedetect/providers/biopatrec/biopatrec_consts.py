@@ -1,0 +1,2 @@
+BIOPATREC_DATA_REPOSITORY_GITHUB_REPO_BASE_URL = "https://github.com/biopatrec/biopatrec/blob/Data_Repository"
+BIOPATREC_DATA_REPOSITORY_DOWNLOAD_GITHUB_BASE_URL = 'https://raw.githubusercontent.com/biopatrec/biopatrec/Data_Repository'
