@@ -1,9 +1,12 @@
+from copy import deepcopy
 from enum import Enum
 import os
 from pathlib import Path
 import re
+from typing import List
 
 from libemg._datasets.dataset import Dataset
+from libemg.filtering import Filter
 from libemg.data_handler import OfflineDataHandler, RegexFilter
 
 import numpy as np
@@ -53,6 +56,7 @@ class AnalogFrontEnd_UntargetedForearm(Dataset):
         self.dataset_folder = dataset_folder
         self.device_name = device.value
         self.persist_data_to_libemg_structure(dataset_info)
+        self.odh = None
     
     
     def persist_data_to_libemg_structure(self, dataset_info):
@@ -92,70 +96,30 @@ class AnalogFrontEnd_UntargetedForearm(Dataset):
         odh = OfflineDataHandler()
         odh.get_data(folder_location = Path(DATASET_FOLDER) / self.device_name, regex_filters=regex_filters, delimiter=",")
 
-        return odh
-
-"""
-class AnalogFrontEnd_UntargetedForearm_TIADS1299(Dataset):
-    def __init__(self, dataset_info = None, dataset_folder=None, device_folder='ADS'):
-        assert dataset_info is not None, "dataset_info must be provided to persist data to libemg structure"
-        
-        Dataset.__init__(self,
-                          SAMPLING_FREQUENCY,
-                          NUM_CHANNELS,
-                          'TI ADS1299',
-                          NUM_SUBJECTS,
-                          GESTURES,
-                          STUDY_NUM_REPS,
-                          STUDY_TITLE,
-                          STUDY_URL)
-
-        self.dataset_folder = dataset_folder
-        self.device_folder = device_folder
-        persist_data_to_libemg_structure(dataset_info, self.device_folder)
+        self.odh = odh
 
 
-        
+    def reset_data(self):
+        self.prepare_data()
 
-    def prepare_data(self):
-        return prepare_data_AnalogFrontEnd_UntargetedForearm(self.dataset_folder, self.device_folder)
-
-
-class AnalogFrontEnd_UntargetedForearm_TIADS1299BiasDriver(Dataset):
-    def __init__(self, dataset_folder=DATASET_ROOT_PATH, device_folder='ADSbias'):
-        Dataset.__init__(self,
-                        SAMPLING_FREQUENCY,
-                        NUM_CHANNELS,
-                        'TI ADS1299 with bias-driver enabled',
-                        NUM_SUBJECTS,
-                        GESTURES,
-                        STUDY_NUM_REPS,
-                        STUDY_TITLE,
-                        STUDY_URL)
-
-        self.dataset_folder = dataset_folder
-        self.device_folder = device_folder
+    
+    def filter_data(self):
+        odh = deepcopy(self.odh)
+        filter = Filter(self.sampling)
+        filter.install_common_filters()
+        filter.filter(odh)
+        self.odh = odh
 
 
-    def prepare_data(self):
-        return prepare_data_AnalogFrontEnd_UntargetedForearm(self.dataset_folder, self.device_folder)
+    def isolate_data(self, subjects: List[int] = None, classes: List[int] = None):
+        """
+        Isolate data for a specific subject and class.
+        """
+        if subjects is None and classes is None:
+            raise ValueError("At least one of subjects or classes must be provided to isolate data.")
 
+        if subject_id is not None:
+            self.odh.filter_by_subject(subject_id)
 
-class AnalogFrontEnd_UntargetedForearm_IntanRHA2216(Dataset):
-    def __init__(self, dataset_folder=DATASET_ROOT_PATH, device_folder='INTAN'):
-        Dataset.__init__(self,
-                        SAMPLING_FREQUENCY,
-                        NUM_CHANNELS,
-                        'Intan RHA2216',
-                        NUM_SUBJECTS,
-                        GESTURES,
-                        STUDY_NUM_REPS,
-                        STUDY_TITLE,
-                        STUDY_URL)
-
-        self.dataset_folder = dataset_folder
-        self.device_folder = device_folder
-
-
-    def prepare_data(self):
-        return prepare_data_AnalogFrontEnd_UntargetedForearm(self.dataset_folder, self.device_folder)
-"""
+        if class_id is not None:
+            self.odh.filter_by_class(class_id)
