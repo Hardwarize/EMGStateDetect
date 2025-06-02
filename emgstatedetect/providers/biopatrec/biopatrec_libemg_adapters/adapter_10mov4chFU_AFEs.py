@@ -28,7 +28,6 @@ GESTURES = {0: 'Open Hand', 1: 'Close Hand', 2: 'Flex Hand',
             3: 'Extend Hand', 4: 'Pronation', 5: 'Supination',
             6: 'Side Grip', 7: 'Fine Grip', 8: 'Agree', 9: 'Pointer'}
 DATASET_FOLDER = "10mov4chFU_AFEs"
-DATASET_ROOT_PATH=""
 
 DEVICE_MAP = {
     Device.ADS.value: 'TI ADS1299',
@@ -56,7 +55,8 @@ class AnalogFrontEnd_UntargetedForearm(Dataset):
         self.dataset_folder = dataset_folder
         self.device_name = device.value
         self.persist_data_to_libemg_structure(dataset_info)
-        self.odh = None
+        self.raw_odh = None
+        self.clean_odh = None
     
     
     def persist_data_to_libemg_structure(self, dataset_info):
@@ -69,8 +69,9 @@ class AnalogFrontEnd_UntargetedForearm(Dataset):
 
                 values_matrix = session_values.data.value[:,:,gesture_id]
                 subject_id = session_name.split('_')[0]
-
-                file_path = Path(self.device_name) / f"Subject_{subject_id}" /  f"C_{gesture_id}.csv"
+                
+                # We need to subtract 1 from subject_id to match the libemg structure (0-indexed)
+                file_path = Path(self.device_name) / "raw" / f"Subject_{int(subject_id)-1}" /  f"C_{gesture_id}.csv"
                 
                 full_path = Path.cwd() / DATASET_FOLDER / file_path
                 full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,12 +79,12 @@ class AnalogFrontEnd_UntargetedForearm(Dataset):
                 np.savetxt(full_path, values_matrix, delimiter=",")
         
 
-    def prepare_data(self):
+    def prepare_data(self, is_clean: bool = False):
         """
         This function uses libemg OfflineDataHandler class to load the dataset from
         a local folder.
         """
-        subject_list = np.array(list(range(1, NUM_SUBJECTS+1)))
+        subject_list = np.arange(NUM_SUBJECTS)
         subjects_values = [str(s) for s in subject_list]
 
         classes_values = [str(i) for i in range(len(GESTURES.items()))]
@@ -94,9 +95,12 @@ class AnalogFrontEnd_UntargetedForearm(Dataset):
         ]
         
         odh = OfflineDataHandler()
-        odh.get_data(folder_location = Path(DATASET_FOLDER) / self.device_name, regex_filters=regex_filters, delimiter=",")
+        odh.get_data(folder_location = Path(DATASET_FOLDER) / self.device_name / ('clean' if is_clean else 'raw'), regex_filters=regex_filters, delimiter=",")
 
-        self.odh = odh
+        if is_clean:
+            self.clean_odh = deepcopy(odh)
+        else:
+            self.raw_odh = deepcopy(odh)
 
 
     def reset_data(self):
@@ -104,7 +108,7 @@ class AnalogFrontEnd_UntargetedForearm(Dataset):
 
     
     def filter_data(self):
-        odh = deepcopy(self.odh)
+        odh = deepcopy(self.raw_odh)
         filter = Filter(self.sampling)
         filter.install_common_filters()
         filter.filter(odh)

@@ -1,36 +1,70 @@
 import numpy as np
+from scipy import stats
 
 
-def build_class_votation_matrix(labels, num_windows, num_samples, window_samples_step, window_samples_size):
-  """
-  The windows clustering step assign one cluster to each window, but finally
-  we are not interested in the window's class but in the sample's class because
-  at the end we need to know if a sample is a resting sample or an action sample.
+def map_window_labels_to_samples_by_voting(labels, window_samples_size, window_samples_step, total_samples):
+    """
+    Assigns a label to each sample by mapping window-based cluster labels (from k-means) 
+    to individual samples using majority voting.
 
-  Because the windows can contains overlapping samples it's likely that one sample
-  ends in more than one window with different label
+    Each sample may belong to multiple overlapping windows. For each sample, the final 
+    label is determined by the most frequent window label among all windows that include the sample.
 
-  multichannel_signal: numpy array de ()
-  """
-  labels_count = []
+    Args:
+        window_labels (array-like): Array of cluster labels assigned to each window.
+        window_indices (list of array-like): List where each element contains the indices 
+            of the samples that belong to the corresponding window.
+        n_samples (int): Total number of samples in the signal.
 
-  for window_idx in range(num_windows):
-    window_label = labels[window_idx]
-    channel_idx = 0
-    t = np.full((num_samples, 1), np.inf)
-    t[window_idx*window_samples_step: window_samples_size+(window_idx*window_samples_step)] = labels[window_idx]
+    Returns:
+        sample_labels (np.ndarray): Array of shape (n_samples,) with the label assigned 
+            to each sample based on majority voting.
+    """
+    
+    assert isinstance(labels, np.ndarray) and labels.ndim == 1, "Variable must be a 1D numpy array."
+    
+    non_window_elements = total_samples - window_samples_size
+    
+    samples_label_voting_matrix = np.vstack(
+        [
+        np.tile(labels, (window_samples_size, 1)),
+        np.full((non_window_elements, labels.shape[0]), np.nan)
+        ]
+    )
+    
+    for i in range(samples_label_voting_matrix.shape[1]):
+        samples_label_voting_matrix[:, i] = np.roll(samples_label_voting_matrix[:, i], i*window_samples_step)
+        
+    sample_labels = stats.mode(samples_label_voting_matrix, axis=1, nan_policy='omit').mode
+    
+    return sample_labels
 
-    labels_count.append(t)
 
-  arr = np.hstack(labels_count)
-  sample_labels = []
+def assign_class_to_labels(multichannel_signal, labels_array):
+    """
+    This function takes a multichannel signal and an array of labels,
+    and an array of labels, then try to check which label corresponds to the action and which one to the rest.
+    It returns a dictionary with two keys: "Rest" and "Action", each containing the label and the corresponding data.
+    """
 
-  for i in arr:
-    filtered_values = i[np.isfinite(i)]
-    values, counts = np.unique(filtered_values, return_counts=True)
-    most_common_label = int(values[counts.argmax()])
-    sample_labels.append(most_common_label)
+    unique_labels = np.unique(labels_array).astype(np.int64) 
+    assert unique_labels.shape[0] == 2, "There must be exactly two unique labels in the labels array. One for action and one for rest."
 
-  # sample_labels contiene un elemento por sample, identificando asi la
-  # categoria de cada sample
-  return sample_labels
+    # Get signals segments by labels
+    split_arrays = [(label, multichannel_signal[labels_array == label,:]) for label in unique_labels]
+    
+    # Get the mean absolute value of each segment
+    # Hopefully the segment with the highest mean absolute value corresponds to the action
+    # and the segment with the lowest mean absolute value corresponds to the rest.
+    info = [(split_array[0], split_array[1], np.abs(split_array[1]).mean()) for split_array in split_arrays]
+
+    if info[0][2] > info[1][2]:
+        return {
+        "Rest" : {"label": info[1][0], "data": info[1][1]},
+        "Action" : {"label": info[0][0], "data": info[0][1]}
+        }
+    else:
+        return {
+        "Rest"  : {"label": info[0][0], "data": info[0][1]},
+        "Action"  : {"state": info[1][0], "data": info[1][1]}
+        }
