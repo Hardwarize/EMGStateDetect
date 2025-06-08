@@ -3,5 +3,9 @@
   "image": "python:3.12",
   "runArgs": ["--platform=linux/amd64"],
   // To fix the issue with the `libGL.so.1` and cv2 python package
-  "postCreateCommand": "apt-get update && apt-get install libgl1"
+  "postCreateCommand": "apt-get update && apt-get install libgl1",
+  "forwardPorts": [
+    8501,
+    7860
+  ]
 }

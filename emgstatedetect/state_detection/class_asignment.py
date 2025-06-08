@@ -66,5 +66,5 @@ def assign_class_to_labels(multichannel_signal, labels_array):
     else:
         return {
         "Rest"  : {"label": info[0][0], "data": info[0][1]},
-        "Action"  : {"state": info[1][0], "data": info[1][1]}
+        "Action"  : {"label": info[1][0], "data": info[1][1]}
         }

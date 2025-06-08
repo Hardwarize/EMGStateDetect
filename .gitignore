@@ -3,3 +3,6 @@
 emgstatedetect.egg-info/
 10mov4chFU_AFEs
 OneSubjectMyoDataset/*
+UI_outputs/
+backup_data/
+.DS_Store
